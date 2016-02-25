@@ -4,6 +4,7 @@ from ColorfulPyPrint import *
 from pprint import pprint
 import pickle
 import sys
+import msg_handler
 from io import StringIO
 
 try:
@@ -16,7 +17,6 @@ except:
 import webqq_api
 
 __VERSION__ = '1.01.02'
-WEBQQ_MSG_SIZE_LIMIT = 900
 
 
 def print_usage_and_exit():
@@ -37,14 +37,17 @@ def selenium_driver_init():
 
 
 verbose_level = 4
-apoutput_set_verbose_level(verbose_level)
 masterQQ = 358890739
 session_file = r'session.dat'
-clients_dic = {}
-DEBUG_PROXY = {
+is_proxy = False
+proxy = {
     "http": "http://127.0.0.1:8882",
     "https": "http://127.0.0.1:8882",
-} if False else {}
+}
+
+# #######################################
+apoutput_set_verbose_level(verbose_level)
+clients_dic = {}
 is_new_session = True
 try:
     # 尝试读取session文件
@@ -94,11 +97,11 @@ if is_new_session:
 
 assert isinstance(qapi, webqq_api.WebqqApi)
 
-qapi.proxies = DEBUG_PROXY
+qapi.proxies = proxy if is_proxy else {}
 masterUin = qapi.q2u(masterQQ)
 # 发送启动信息
 infoprint('正在发送启动信息')
-qapi.send_message('WebQQ system ONLINE', qapi.q2u(masterQQ))
+qapi.send_msg_slice('WebQQ system ONLINE', qapi.q2u(masterQQ))
 
 # 接受信息
 while True:
@@ -106,32 +109,10 @@ while True:
     pprint(msg)
     sender_uin = msg['from_uin']
     msg_content = msg['content']
-    try:
-        qapi.send_message('RECEIVED MSG: ' + msg_content, sender_uin)
-    except Exception as e:
-        qapi.send_message('发送失败:' + str(e), sender_uin)
     if verbose_level >= 4 and sender_uin != masterUin and sender_uin != 0:
         qapi.send_message('RECEIVED MSG from' + str(qapi.u2q(sender_uin)) + ': \n' + msg_content, masterUin)
 
     # 在测试模式中,赋予master执行任意命令的权限
-    if verbose_level >= 4 and sender_uin == masterUin:
-        if msg_content[:5] == 'exec ':
-            _default_stdout = sys.stdout
-            str_io = StringIO()
-            try:
-                sys.stdout = str_io
-                exec(msg_content[5:])
-                sys.stdout = _default_stdout
-                str_io.seek(0)
-                buffer = str_io.readline(WEBQQ_MSG_SIZE_LIMIT)
-                while buffer:
-                    result = qapi.send_message(buffer, masterUin)
-                    buffer = str_io.readline(WEBQQ_MSG_SIZE_LIMIT)
-                print(str_io.getvalue())  # 打印到正常的stdout
-            except Exception as e:
-                sys.stdout = _default_stdout
-                qapi.send_message('ERROR:' + str(e), masterUin)
-                errprint('命令执行错误:', e)
-            finally:
-                sys.stdout = _default_stdout
-                del str_io
+    if verbose_level >= 4 and sender_uin == masterUin \
+            and msg_content[:5] == 'exec ':
+        msg_handler.master_exec_python_code(qapi, msg_content[5:], masterQQ)

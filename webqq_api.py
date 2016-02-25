@@ -19,10 +19,12 @@ except:
     exit()
 from cookies_convert import selenium2requests
 
-DEFAULT_WEBQQ_CLIENTID = 53999199
-__VERSION__ = '1.03.00'
+__VERSION__ = '1.04.00'
+API_VERSION = '1.04.00'
 
-API_VERSION = '1.03.00'
+DEFAULT_WEBQQ_CLIENTID = 53999199
+WEBQQ_MSG_SIZE_LIMIT = 850
+MSG_SEND_DELAY = 0.2  # seconds
 
 
 def html_unescape(string):
@@ -354,7 +356,7 @@ class WebqqApi(object):
     def send_message(self, msg_content, target_uin, psessionid="", face=525, msg_id=42120002,
                      clientid=0):
         """
-        向目标(tuin)发送信息
+        向目标(uin)发送信息,建议用自带分片的send_msg_slice代替
 
         :type clientid: int
         :type msg_id: int
@@ -390,6 +392,24 @@ class WebqqApi(object):
         else:
             errprint('发送信息失败:', rsp_json)
             return False
+
+    def send_msg_slice(self, msg_content, target_uin):
+        """
+        将长消息分片发送(短消息也建议用这个函数)
+
+        :type target_uin: int
+        :type msg_content: str
+        """
+        if len(msg_content) <= WEBQQ_MSG_SIZE_LIMIT:  # 长度足够小,正常发送
+            return self.send_message(msg_content, target_uin)
+
+        slices_num = (len(msg_content) + WEBQQ_MSG_SIZE_LIMIT // 2) // WEBQQ_MSG_SIZE_LIMIT
+        for i in range(slices_num - 1):
+            self.send_message('[[' + str(i + 1) + '/' + str(slices_num) + ']]'
+                              + msg_content[i * WEBQQ_MSG_SIZE_LIMIT:(i + 1) * WEBQQ_MSG_SIZE_LIMIT], target_uin)
+            sleep(MSG_SEND_DELAY)
+        return self.send_message('[[' + str(slices_num) + '/' + str(slices_num) + ']]'
+                                 + msg_content[(slices_num - 1) * WEBQQ_MSG_SIZE_LIMIT:], target_uin)
 
     def pull_message(self, ptwebqq="", psessionid="", clientid=0, key='', timeout=0):
         """
