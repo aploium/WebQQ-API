@@ -16,7 +16,7 @@ except:
 import webqq_api
 
 __VERSION__ = '1.01.02'
-WEBQQ_MSG_SIZE_LIMIT = 512
+WEBQQ_MSG_SIZE_LIMIT = 900
 
 
 def print_usage_and_exit():
@@ -106,8 +106,10 @@ while True:
     pprint(msg)
     sender_uin = msg['from_uin']
     msg_content = msg['content']
-
-    qapi.send_message('RECEIVED MSG: ' + msg_content, sender_uin)
+    try:
+        qapi.send_message('RECEIVED MSG: ' + msg_content, sender_uin)
+    except Exception as e:
+        qapi.send_message('发送失败:' + str(e), sender_uin)
     if verbose_level >= 4 and sender_uin != masterUin and sender_uin != 0:
         qapi.send_message('RECEIVED MSG from' + str(qapi.u2q(sender_uin)) + ': \n' + msg_content, masterUin)
 
