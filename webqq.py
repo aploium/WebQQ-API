@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-from time import sleep, time
+from time import sleep
 from ColorfulPyPrint import *
 from pprint import pprint
 import pickle
-import sys
 import msg_handler
-from io import StringIO
 
 try:
     from selenium import webdriver
@@ -99,6 +97,7 @@ assert isinstance(qapi, webqq_api.WebqqApi)
 
 qapi.proxies = proxy if is_proxy else {}
 masterUin = qapi.q2u(masterQQ)
+dbgprint('用户:', qapi.qq_to_uin_dict)
 # 发送启动信息
 infoprint('正在发送启动信息')
 qapi.send_msg_slice('WebQQ system ONLINE', qapi.q2u(masterQQ))
