@@ -65,19 +65,22 @@ def extract_uin_from_page_source(page_source):
 
     class MyHTMLParser(HTMLParser):
         def set_var(self):
-            self.var = set()
+            self.var = {'discuss': set(),
+                        'friend': set(),
+                        'group': set()}
 
         def handle_starttag(self, tag, attrs):
             for attr in attrs:
-                if attr[0] == '_uin':
-                    self.var.add(int(attr[1]))
+                if attr[0] == '_type':
+                    uin_type = attr[1]
+                    for attrb in attrs:
+                        if attrb[0] == '_uin':
+                            self.var[uin_type].add(int(attrb[1]))
 
     parser = MyHTMLParser()
     parser.set_var()
     parser.feed(page_source)
-    uin_list = list(parser.var)
-    del parser
-    return uin_list
+    return parser.var
 
 
 class WebqqApi(object):
@@ -393,23 +396,66 @@ class WebqqApi(object):
             errprint('发送信息失败:', rsp_json)
             return False
 
-    def send_msg_slice(self, msg_content, target_uin):
+    def send_msg_slice(self, msg_content, target_uin, msg_type='friend', **kwargs):
         """
         将长消息分片发送(短消息也建议用这个函数)
 
         :type target_uin: int
         :type msg_content: str
         """
+        send_function = {'friend': self.send_message, 'discuss': self.send_discuss_msg}[msg_type]
         if len(msg_content) <= WEBQQ_MSG_SIZE_LIMIT:  # 长度足够小,正常发送
-            return self.send_message(msg_content, target_uin)
+            return send_function(msg_content, target_uin, **kwargs)
 
         slices_num = (len(msg_content) + WEBQQ_MSG_SIZE_LIMIT // 2) // WEBQQ_MSG_SIZE_LIMIT
         for i in range(slices_num - 1):
-            self.send_message('[[' + str(i + 1) + '/' + str(slices_num) + ']]'
-                              + msg_content[i * WEBQQ_MSG_SIZE_LIMIT:(i + 1) * WEBQQ_MSG_SIZE_LIMIT], target_uin)
+            send_function('[[' + str(i + 1) + '/' + str(slices_num) + ']]'
+                          + msg_content[i * WEBQQ_MSG_SIZE_LIMIT:(i + 1) * WEBQQ_MSG_SIZE_LIMIT], target_uin,
+                          **kwargs)
             sleep(MSG_SEND_DELAY)
-        return self.send_message('[[' + str(slices_num) + '/' + str(slices_num) + ']]'
-                                 + msg_content[(slices_num - 1) * WEBQQ_MSG_SIZE_LIMIT:], target_uin)
+        return send_function('[[' + str(slices_num) + '/' + str(slices_num) + ']]'
+                             + msg_content[(slices_num - 1) * WEBQQ_MSG_SIZE_LIMIT:], target_uin, **kwargs)
+
+    def send_msg_slice_discuss(self, msg_content, target_did, **kwargs):
+        """
+        分片发送信息到讨论组
+
+        :param msg_content: str
+        :param target_did: int
+        """
+        return self.send_msg_slice(msg_content, target_did, msg_type='discuss', **kwargs)
+
+    def send_discuss_msg(self, msg_content, target_did, clientid=0, psessionid="", face=525, msg_id=72690003):
+        """
+        发送信息到讨论组
+        """
+        rsp_json = self._request_and_parse(
+            method='POST',
+            url='http://d1.web2.qq.com/channel/send_discu_msg2',
+            data_dict={
+                'clientid': clientid if clientid else self.clientid,
+                'content': json_dumps(  # 蛋疼的content需要预dump一次
+                    [
+                        msg_content,  # 信息内容主体
+                        ["font", {"name": "宋体",
+                                  "size": 10,
+                                  "style": [0, 0, 0],
+                                  "color": "000000"}
+                         ]
+                    ]
+                ),
+                'face': face,
+                'msg_id': msg_id + randint(0, 12120002),
+                'psessionid': psessionid if psessionid else self.psessionid,
+                'did': target_did  # 接收对象
+            }
+        )
+
+        if 'errCode' in rsp_json and rsp_json['errCode'] == 0 or rsp_json['retcode'] == 1202:
+            return True
+        else:
+            errprint('发送信息失败:', rsp_json)
+            return False
 
     def pull_message(self, ptwebqq="", psessionid="", clientid=0, key='', timeout=0):
         """
@@ -475,6 +521,28 @@ class WebqqApi(object):
         self.requests_sess.cookies = selenium2requests(driver.get_cookies(), self.requests_sess.cookies)
         driver.get('http://w.qq.com/')
 
+    def get_discuss_info(self, did, vfwebqq="", clientid=0, psessionid=""):
+        """
+        获取讨论组信息
+        :type psessionid: str
+        :type clientid: int
+        :param did: int
+        """
+
+        rsp_json = self._request_and_parse(
+            method='GET',
+            url='http://d1.web2.qq.com/channel/get_discu_info',
+            data_dict={
+                'did': did,
+                'vfwebqq': vfwebqq if vfwebqq else self.vfwebqq,
+                'clientid': clientid if clientid else self.clientid,
+                'psessionid': psessionid if psessionid else self.psessionid,
+                't': int(time()),  # unix time
+            }
+        )
+        dbgprint('获取群信息', rsp_json, v=4)
+        return rsp_json['result']['info']
+
     def fetch_friends_dict_from_page_source(self, page_source):
         """
         从页面源码中提取出好友uin列表,并转化为QQ号-uin的字典
@@ -483,10 +551,19 @@ class WebqqApi(object):
         """
         self.page_source = page_source
         uin_list = extract_uin_from_page_source(page_source)
-        for uin in uin_list:
+        for uin in uin_list['friend']:  # 好友列表
             qq = int(self.get_qq_from_uin(uin))
             self.qq_to_uin_dict[qq] = uin
             self.uin_to_qq_dict[uin] = qq
+
+        for did in uin_list['discuss']:  # 好友列表
+            discuss_info = self.get_discuss_info(did)
+            self.discuss[discuss_info['discu_name']] = discuss_info
+
+            # for uin in uin_list['group']:  # 群列表
+            #     qq = int(self.get_qq_from_uin(uin))
+            #     self.qq_to_uin_dict[qq] = uin
+            #     self.uin_to_qq_dict[uin] = qq
 
     def lazy_init(self):
         """
@@ -547,7 +624,9 @@ class WebqqApi(object):
             'pull_msg_timeout': self.pull_msg_timeout,
             'max_retries_count': self.max_retries_count,
             'create_time': self.create_time,
-            'page_source': self.page_source
+            'page_source': self.page_source,
+            'group': self.group,
+            'discuss_for_notice': self.discuss_for_notice
         }
 
     def __init__(self, requests_sess=None, proxies=None, create_time=0,
@@ -565,6 +644,9 @@ class WebqqApi(object):
         self.ptwebqq = ""
         self.psessionid = ""
         self.vfwebqq = ""
+        self.group = {}  # 群
+        self.discuss = {}  # 讨论组(正常的数据结构)
+        self.discuss_for_notice = {}  # 讨论组(用于单播的数据结构)
         self.page_source = page_source if page_source is not None else ""
         self.proxies = proxies if proxies is not None else {}
         self.qq_to_uin_dict = qq_to_uin_dict if qq_to_uin_dict is not None else {}

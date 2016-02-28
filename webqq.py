@@ -36,8 +36,9 @@ def selenium_driver_init():
 
 verbose_level = 4
 masterQQ = 358890739
+masterDiscuss = 'Xno0Pu7bnCB'
 session_file = r'session.dat'
-is_proxy = False
+is_proxy = True
 proxy = {
     "http": "http://127.0.0.1:8882",
     "https": "http://127.0.0.1:8882",
@@ -88,7 +89,7 @@ if is_new_session:
             sleep(3)
     infoprint('获取用户列表')
     qapi.fetch_friends_dict_from_page_source(driver.page_source)
-    driver.quit()
+    # driver.quit()
     infoprint('初始化完成,将数据写入session备用')
     with open(session_file, 'wb') as fp:
         pickle.dump(qapi, fp)
@@ -101,6 +102,7 @@ dbgprint('用户:', qapi.qq_to_uin_dict)
 # 发送启动信息
 infoprint('正在发送启动信息')
 qapi.send_msg_slice('WebQQ system ONLINE', qapi.q2u(masterQQ))
+qapi.send_msg_slice_discuss('WebQQ system ONLINE', qapi.discuss['Xno0Pu7bnCB']['did'])
 
 # 接受信息
 while True:
