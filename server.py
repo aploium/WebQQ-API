@@ -7,6 +7,8 @@ from ColorfulPyPrint import *
 import msg_handler
 from time import time
 
+DEFAULT_PORT = 34567
+
 
 # #########  stand along functions  #############
 
@@ -68,10 +70,12 @@ def handle_tcp_request(sock, addr, webqq_obj, tokens):
         return
 
     # 处理命令
-    if paras['cmd'] == 'sendtodis':
+    if paras['cmd'] == 'sendtodis':  # 发送到讨论组
         msg_handler.send_notice_to_discuss(paras['msg'], paras['target'], webqq_obj)
-    elif paras['cmd'] == 'sendtoqq':
+    elif paras['cmd'] == 'sendtoqq':  # 发送到qq私聊
         msg_handler.send_notice_to_qq(paras['msg'], int(paras['target']), webqq_obj)
+    elif paras['cmd'] == 'handshake':  # 握手
+        sock.send(b'handshakeOK')
 
     sock.send(b'thank you')
     sock.close()
@@ -88,7 +92,7 @@ def tcp_listen(port, webqq_obj, tokens):
         t.start()
 
 
-def msg_server_start(webqq_obj, tokens=None, listen_port=80):
+def msg_server_start(webqq_obj, tokens=None, listen_port=DEFAULT_PORT):
     if tokens is None:
         warnprint('没有指定token,可能导致恶意利用')
     dbgprint('tokens=', tokens)
