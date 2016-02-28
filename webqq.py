@@ -13,8 +13,9 @@ except:
     errprint('需要selenium,requests包的支持,请安装: pip install selenium requests')
     exit()
 import webqq_api
+from server import msg_server_start
 
-__VERSION__ = '1.01.02'
+__VERSION__ = '1.08.00'
 
 
 def print_usage_and_exit():
@@ -89,6 +90,8 @@ if is_new_session:
             sleep(3)
     infoprint('获取用户列表')
     qapi.fetch_friends_dict_from_page_source(driver.page_source)
+    qapi.master_qq = masterQQ
+    qapi.master_discuss_name = masterDiscuss
     # driver.quit()
     infoprint('初始化完成,将数据写入session备用')
     with open(session_file, 'wb') as fp:
@@ -97,12 +100,15 @@ if is_new_session:
 assert isinstance(qapi, webqq_api.WebqqApi)
 
 qapi.proxies = proxy if is_proxy else {}
-masterUin = qapi.q2u(masterQQ)
+masterUin = qapi.q2u(qapi.master_qq)
 dbgprint('用户:', qapi.qq_to_uin_dict)
 # 发送启动信息
 infoprint('正在发送启动信息')
-qapi.send_msg_slice('WebQQ system ONLINE', qapi.q2u(masterQQ))
-qapi.send_msg_slice_discuss('WebQQ system ONLINE', qapi.discuss['Xno0Pu7bnCB']['did'])
+qapi.send_msg_slice('WebQQ system ONLINE version: ' + __VERSION__, qapi.q2u(qapi.master_qq))
+qapi.send_msg_slice('WebQQ system ONLINE version: ' + __VERSION__, qapi.discuss[qapi.master_discuss_name]['did'])
+
+# 初始化服务器
+msg_server_start(qapi, tokens={'apl'})
 
 # 接受信息
 while True:

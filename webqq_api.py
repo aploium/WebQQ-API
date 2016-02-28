@@ -19,8 +19,8 @@ except:
     exit()
 from cookies_convert import selenium2requests
 
-__VERSION__ = '1.04.00'
-API_VERSION = '1.04.00'
+__VERSION__ = '1.08.00'
+API_VERSION = '1.08.00'
 
 DEFAULT_WEBQQ_CLIENTID = 53999199
 WEBQQ_MSG_SIZE_LIMIT = 850
@@ -49,6 +49,7 @@ def load_session(session_file):
     if old_api.api_version < API_VERSION:  # 更新API版本
         new_api = WebqqApi(**(old_api.get_all_variable()))
         new_api.lazy_init()
+        new_api.fetch_friends_dict_from_page_source(new_api.page_source)
         with open(session_file, 'wb') as fp:
             pickle.dump(new_api, fp)  # 更新session文件中的版本
         return new_api
@@ -396,13 +397,14 @@ class WebqqApi(object):
             errprint('发送信息失败:', rsp_json)
             return False
 
-    def send_msg_slice(self, msg_content, target_uin, msg_type='friend', **kwargs):
+    def send_msg_slice(self, msg_content, target_uin, **kwargs):
         """
         将长消息分片发送(短消息也建议用这个函数)
 
         :type target_uin: int
         :type msg_content: str
         """
+        msg_type = self.uin_type[target_uin]
         send_function = {'friend': self.send_message, 'discuss': self.send_discuss_msg}[msg_type]
         if len(msg_content) <= WEBQQ_MSG_SIZE_LIMIT:  # 长度足够小,正常发送
             return send_function(msg_content, target_uin, **kwargs)
@@ -415,15 +417,6 @@ class WebqqApi(object):
             sleep(MSG_SEND_DELAY)
         return send_function('[[' + str(slices_num) + '/' + str(slices_num) + ']]'
                              + msg_content[(slices_num - 1) * WEBQQ_MSG_SIZE_LIMIT:], target_uin, **kwargs)
-
-    def send_msg_slice_discuss(self, msg_content, target_did, **kwargs):
-        """
-        分片发送信息到讨论组
-
-        :param msg_content: str
-        :param target_did: int
-        """
-        return self.send_msg_slice(msg_content, target_did, msg_type='discuss', **kwargs)
 
     def send_discuss_msg(self, msg_content, target_did, clientid=0, psessionid="", face=525, msg_id=72690003):
         """
@@ -555,10 +548,12 @@ class WebqqApi(object):
             qq = int(self.get_qq_from_uin(uin))
             self.qq_to_uin_dict[qq] = uin
             self.uin_to_qq_dict[uin] = qq
+            self.uin_type[uin] = 'friend'
 
         for did in uin_list['discuss']:  # 好友列表
             discuss_info = self.get_discuss_info(did)
             self.discuss[discuss_info['discu_name']] = discuss_info
+            self.uin_type[did] = 'discuss'
 
             # for uin in uin_list['group']:  # 群列表
             #     qq = int(self.get_qq_from_uin(uin))
@@ -610,26 +605,17 @@ class WebqqApi(object):
             return None
 
     def get_all_variable(self):
-        return {
-            'ptwebqq': self.ptwebqq,
-            'psessionid': self.psessionid,
-            'vfwebqq': self.vfwebqq,
-            'api_version': self.api_version,
-            'qq_to_uin_dict': self.qq_to_uin_dict,
-            'uin_to_qq_dict': self.uin_to_qq_dict,
-            'requests_sess': self.requests_sess,
-            'verbose_level': self.verbose_level,
-            'proxies': self.proxies,
-            'retries_delay': self.retries_delay,
-            'pull_msg_timeout': self.pull_msg_timeout,
-            'max_retries_count': self.max_retries_count,
-            'create_time': self.create_time,
-            'page_source': self.page_source,
-            'group': self.group,
-            'discuss_for_notice': self.discuss_for_notice
-        }
+        """
+        取出类中所有变量
+        """
+        var = {}
+        for v in dir(self):
+            if not isinstance(type(self.__getattribute__(v)), type(self.get_all_variable)) \
+                    and '__' not in v:
+                var[v] = self.__getattribute__(v)
+        return var
 
-    def __init__(self, requests_sess=None, proxies=None, create_time=0,
+    def __init__(self, master_qq=0, master_discuss_name=None, requests_sess=None, proxies=None, create_time=0,
                  qq_to_uin_dict=None, uin_to_qq_dict=None, page_source=None,
                  verbose_level=1, pull_msg_timeout=200,
                  max_retries_count=5, retries_delay=5, clientid=0, **kwargs):
@@ -644,9 +630,12 @@ class WebqqApi(object):
         self.ptwebqq = ""
         self.psessionid = ""
         self.vfwebqq = ""
+        self.uin_type = {}  # 提供uin到客户端类型的转换 (friend group discuss)
         self.group = {}  # 群
         self.discuss = {}  # 讨论组(正常的数据结构)
-        self.discuss_for_notice = {}  # 讨论组(用于单播的数据结构)
+        # self.discuss_for_notice = {}  # 讨论组(用于单播的数据结构)
+        self.master_qq = master_qq if master_qq else None
+        self.master_discuss_name = master_discuss_name if master_discuss_name else None
         self.page_source = page_source if page_source is not None else ""
         self.proxies = proxies if proxies is not None else {}
         self.qq_to_uin_dict = qq_to_uin_dict if qq_to_uin_dict is not None else {}
@@ -664,3 +653,6 @@ class WebqqApi(object):
         self.update_headers()
 
         apoutput_set_verbose_level(self.verbose_level)
+
+        if self.master_qq is None:
+            warnprint('管理员qq未设置,建议在初始化时指定 master_qq= 参数指定管理员qq')
