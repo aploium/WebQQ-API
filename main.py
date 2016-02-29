@@ -39,7 +39,7 @@ verbose_level = 4
 masterQQ = 358890739
 masterDiscuss = 'Xno0Pu7bnCB'
 session_file = r'session.dat'
-is_proxy = True
+is_proxy = False
 proxy = {
     "http": "http://127.0.0.1:8882",
     "https": "http://127.0.0.1:8882",
