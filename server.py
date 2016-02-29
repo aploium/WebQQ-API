@@ -2,7 +2,7 @@ import socket
 import threading
 from urllib.parse import unquote_plus
 import subprocess
-from re import findall as re_findall
+from re import findall as re_findall, MULTILINE as RE_MULTILINE, DOTALL as RE_DOTALL
 from ColorfulPyPrint import *
 import msg_handler
 from time import time
@@ -29,7 +29,7 @@ def generate_tcp_port_blacklist(tcp_port_blacklist=None):
 
 
 def extract_paras(string):
-    search = re_findall(r'_(?P<name>\w+?)_=_\{\{\{\{(?P<value>.*?)\}\}\}\}_', string)
+    search = re_findall(r'_(?P<name>\w+?)_=_\{\{\{\{(?P<value>.*?)\}\}\}\}_', string, flags=RE_MULTILINE | RE_DOTALL)
     return {name: value for name, value in search}
 
 
@@ -82,14 +82,17 @@ def handle_tcp_request(sock, addr, webqq_obj, tokens):
 
 
 def tcp_listen(port, webqq_obj, tokens):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('0.0.0.0', port))
+    s.listen(50)
     while True:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('0.0.0.0', port))
-        s.listen(4)
-        sock, addr = s.accept()
-        infoprint('accept connection from', addr)
-        t = threading.Thread(target=handle_tcp_request, args=(sock, addr, webqq_obj, tokens))
-        t.start()
+        try:
+            sock, addr = s.accept()
+            infoprint('accept connection from', addr)
+            t = threading.Thread(target=handle_tcp_request, args=(sock, addr, webqq_obj, tokens))
+            t.start()
+        except Exception as e:
+            errprint('在处理webqq客户端信息时发生错误:', e)
 
 
 def msg_server_start(webqq_obj, tokens=None, listen_port=DEFAULT_PORT):
@@ -111,4 +114,4 @@ if __name__ == '__main__':
     while port in tcpPortBlackList:
         port += 1
     infoprint('Listening LPort: %d' % port)
-    tcp_listen(port)
+    tcp_listen(port, None, None)

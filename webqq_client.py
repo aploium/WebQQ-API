@@ -3,6 +3,7 @@ import socket
 import threading
 
 DEFAULT_PORT = 34567
+__VERSION__ = '0.1.0'
 
 
 def assembly_payload(paras):
