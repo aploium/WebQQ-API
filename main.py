@@ -15,7 +15,7 @@ except:
 import webqq_api
 from server import msg_server_start
 
-__VERSION__ = '1.08.00'
+__VERSION__ = '1.08.02'
 
 
 def print_usage_and_exit():
@@ -111,15 +111,20 @@ qapi.send_msg_slice('WebQQ system ONLINE version: ' + __VERSION__, qapi.discuss[
 msg_server_start(qapi, tokens={'apl'})
 
 # 接受信息
+infoprint('开始接收信息')
 while True:
-    msg = qapi.pull_message()
-    pprint(msg)
-    sender_uin = msg['from_uin']
-    msg_content = msg['content']
-    if verbose_level >= 4 and sender_uin != masterUin and sender_uin != 0:
-        qapi.send_message('RECEIVED MSG from' + str(qapi.u2q(sender_uin)) + ': \n' + msg_content, masterUin)
+    try:
+        msg = qapi.pull_message()
+        pprint(msg)
+        sender_uin = msg['from_uin']
+        msg_content = msg['content']
+        if verbose_level >= 4 and sender_uin != masterUin and sender_uin != 0:
+            qapi.send_message('RECEIVED MSG from' + str(qapi.u2q(sender_uin)) + ': \n' + msg_content, masterUin)
 
-    # 在测试模式中,赋予master执行任意命令的权限
-    if verbose_level >= 4 and sender_uin == masterUin \
-            and msg_content[:5] == 'exec ':
-        msg_handler.master_exec_python_code(qapi, msg_content[5:], masterQQ)
+        # 在测试模式中,赋予master执行任意命令的权限
+        if verbose_level >= 4 and sender_uin == masterUin \
+                and msg_content[:5] == 'exec ':
+            msg_handler.master_exec_python_code(qapi, msg_content[5:], masterQQ)
+    except Exception as e:
+        errprint('监听信息时发生错误:', e)
+        sleep(5)
