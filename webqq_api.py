@@ -19,8 +19,8 @@ except:
     exit()
 from cookies_convert import selenium2requests
 
-__VERSION__ = '1.08.00'
-API_VERSION = '1.08.00'
+__VERSION__ = '1.09.00'
+API_VERSION = '1.09.00'
 
 DEFAULT_WEBQQ_CLIENTID = 53999199
 WEBQQ_MSG_SIZE_LIMIT = 850
@@ -87,6 +87,11 @@ def extract_uin_from_page_source(page_source):
 class WebqqApi(object):
     """
     一套封装为python类的webqq的API
+
+    对uin的说明:
+      腾讯后台对用户的标记并不是以QQ为标示的,而是以一串uin的数字(qq/群/讨论组都有uin).
+    讨论组和qq群的uin是固定不变的,而QQ用户的uin会发生改变(改变方式暂不清楚)
+      在发送/接受信息时,腾讯服务器接受/给出的都是uin而不是QQ号/群号
     """
 
     def update_headers(self, headers=None):

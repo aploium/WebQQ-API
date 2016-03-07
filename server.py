@@ -1,56 +1,52 @@
+# -*- coding: utf-8 -*-
+"""
+webqq消息服务器,供外部程序/计算机通过本机发送消息到qq
+外部程序的请求格式见webqq_client.py中的说明
+"""
 import socket
 import threading
 from urllib.parse import unquote_plus
-import subprocess
 from re import findall as re_findall, MULTILINE as RE_MULTILINE, DOTALL as RE_DOTALL
 from ColorfulPyPrint import *
 import msg_handler
 from time import time
 
+__author__ = 'aploium@aploium.com'
 DEFAULT_PORT = 34567
 
 
 # #########  stand along functions  #############
 
-def generate_tcp_port_blacklist(tcp_port_blacklist=None):
-    if tcp_port_blacklist is None:
-        tcp_port_blacklist = set()
-    cmd = 'netstat -an'
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    output = p.communicate()[0].decode('gbk')
-
-    # ###### TCP ######
-    match = re_findall(r' +TCP +\d+\.\d+\.\d+\.\d+:(?P<lport>\d+)'
-                       r' +\d+\.\d+\.\d+\.\d+:\d+'
-                       r' +\w+ *', output)
-    for port in match:
-        tcp_port_blacklist.add(int(port))
-    return tcp_port_blacklist
-
-
 def extract_paras(string):
+    """
+    从用户的请求中解析出参数,具体格式见webqq_client.py中的说明
+    :param string: str
+    """
     search = re_findall(r'_(?P<name>\w+?)_=_\{\{\{\{(?P<value>.*?)\}\}\}\}_', string, flags=RE_MULTILINE | RE_DOTALL)
     return {name: value for name, value in search}
 
 
 def handle_tcp_request(sock, addr, webqq_obj, tokens):
+    """
+    处理传入的tcp连接
+    """
     buffer_size = 1024
     buffer = []
-    while True:
+    while True:  # 接受对方所有的输入内容
         d = sock.recv(buffer_size)
         infoprint(len(d), d)
         buffer.append(d)
         if len(d) < buffer_size:
             break
     data = b''.join(buffer)
-    try:
+    try:  # 对于windows cmd的直接发送,数据是gbk编码的,需要尝试解码
         data = data.decode(encoding='utf-8')
         dbgprint('charset=utf-8')
     except:
         data = data.decode(encoding='gbk')
         dbgprint('charset=gbk')
-    data = unquote_plus(data)
-    paras = extract_paras(data)
+    data = unquote_plus(data)  # urldecode
+    paras = extract_paras(data)  # 根据格式提取出有效参数
 
     dbgprint(*addr, 'request paras:', paras)
 
@@ -83,35 +79,27 @@ def handle_tcp_request(sock, addr, webqq_obj, tokens):
 
 def tcp_listen(port, webqq_obj, tokens):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('0.0.0.0', port))
-    s.listen(50)
+    s.bind(('0.0.0.0', port))  # 监听0.0.0.0表示允许任意客户端ip
+    s.listen(50)  # 最大允许客户端数
     while True:
         try:
-            sock, addr = s.accept()
+            sock, addr = s.accept()  # 接受一个传入TCP连接
             infoprint('accept connection from', addr)
-            t = threading.Thread(target=handle_tcp_request, args=(sock, addr, webqq_obj, tokens))
+            t = threading.Thread(target=handle_tcp_request,
+                                 args=(sock, addr, webqq_obj, tokens)
+                                 )  # 新线程处理这个传入连接
             t.start()
         except Exception as e:
             errprint('在处理webqq客户端信息时发生错误:', e)
 
 
-def msg_server_start(webqq_obj, tokens=None, listen_port=DEFAULT_PORT):
+def msg_server_start(webqq_obj, tokens=None, listen_port=None):
     if tokens is None:
         warnprint('没有指定token,可能导致恶意利用')
+    if listen_port is None:
+        listen_port = DEFAULT_PORT
     dbgprint('tokens=', tokens)
-    tcp_port_black_list = generate_tcp_port_blacklist()
-    while listen_port in tcp_port_black_list:
-        listen_port += 1
     infoprint('Listening LPort: %d' % listen_port)
+    # 创建一个监听用线程
     t = threading.Thread(target=tcp_listen, args=(listen_port, webqq_obj, tokens))
     t.start()
-
-
-if __name__ == '__main__':
-    apoutput_set_verbose_level(3)
-    port = 80
-    tcpPortBlackList = generate_tcp_port_blacklist()
-    while port in tcpPortBlackList:
-        port += 1
-    infoprint('Listening LPort: %d' % port)
-    tcp_listen(port, None, None)
