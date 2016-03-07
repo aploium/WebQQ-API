@@ -16,7 +16,7 @@ except:
 import webqq_api
 from server import msg_server_start
 
-__VERSION__ = '1.09.00'
+__VERSION__ = '1.09.01'
 __author__ = 'aploium@aploium.com'
 
 
@@ -105,7 +105,8 @@ def selenium_driver_init():
 
 
 infoprint('程序正在初始化,处理命令行参数')
-os.chdir(os.path.dirname(__file__))  # 切换工作目录到脚本所在文件夹
+if os.path.dirname(__file__):
+    os.chdir(os.path.dirname(__file__))  # 切换工作目录到脚本所在文件夹
 force_new_session = False
 is_start_msg_server = False
 msg_server_tokens = set()
