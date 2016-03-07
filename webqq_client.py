@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+用于内嵌到其他程序中,为其他程序添加发送到qq功能
+"""
 import socket
 import threading
 

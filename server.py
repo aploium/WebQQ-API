@@ -56,7 +56,7 @@ def handle_tcp_request(sock, addr, webqq_obj, tokens):
 
     # 需要cmd参数
     if 'cmd' not in paras:
-        warnprint('缺少cmd参数')
+        warnprint('缺少cmd参数,链接关闭')
         sock.send(b'cmd missing  ' + str(time()).encode())
         sock.close()
         return
@@ -64,7 +64,7 @@ def handle_tcp_request(sock, addr, webqq_obj, tokens):
     # 验证token
     if tokens is not None and \
             ('token' not in paras or paras['token'] not in tokens):
-        warnprint('token缺失或错误')
+        warnprint('token缺失或错误,链接关闭')
         sock.send(b'token missing or wrong  ' + str(time()).encode())
         sock.close()
         return
