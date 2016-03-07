@@ -20,6 +20,10 @@ _msg_=_{{{{hello world}}}}_
 _target_=_{{{{345678901}}}}_
 
 发送方式:
+    0.在其他python程序中发送信息(支持py2.6 2.7 3.4 3.5+)
+        from webqq_client import WebqqClient
+        ...下面的代码请看本文件底部的demo..
+
     1.以raw socket发送就是上面的样子,直接发送(换行只是为了阅读方便)
 
     2.以浏览器请求的方式发送
@@ -180,6 +184,7 @@ if __name__ == '__main__':
     server = None
     target = None
     token = None
+    port = None
     target_type = None  # 'qq'->QQ朋友 'discuss'->讨论组
 
     print('Version: ', __VERSION__)
@@ -189,7 +194,11 @@ if __name__ == '__main__':
           '注:截止目前(2016-03-07),WebQQ服务器出问题了(不是本程序的锅),私戳发送到QQ暂时失效,'
           '请与小号新建一个讨论组来接受信息\n\n')
     if server is None:
-        server = input('请输入webqq消息服务器: ')
+        server = input('请输入webqq消息服务器(如127.0.0.1): ')
+    if port is None:
+        port = input('请输入端口,什么都不输按回车使用默认端口(): ')
+        if not port:
+            port = DEFAULT_PORT
     if target is None:
         buff = input('请输入目标QQ或讨论组名称,若输入为纯数字则被认为是QQ号,否则视为讨论组名: ')
         try:
@@ -208,6 +217,7 @@ if __name__ == '__main__':
         token=token,
         target=target,  # 默认的目标(一般就是你自己)
         default_target_type=target_type,  # 默认目标的类型,即上一行target的类型 'qq'->QQ朋友 'discuss'->讨论组
+        port=port  # 端口,一般不需要指定,使用默认值即可
     )
 
     # 若初始化时指定了 token,target,default_target_type 那么这个类可以当成一个file-like object使用
