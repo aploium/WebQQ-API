@@ -16,7 +16,7 @@ except:
 import webqq_api
 from server import msg_server_start
 
-__VERSION__ = '1.09.01'
+__VERSION__ = '1.09.02'
 __author__ = 'aploium@aploium.com'
 
 
